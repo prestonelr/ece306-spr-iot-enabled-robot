@@ -1,12 +1,25 @@
+//==============================================================================
+// File Name : interrupt.c
+//
+// Description:
+//  - TB0 CCR0 @ 200ms: sets update_display flag + blinks backlight if latched ON
+//  - SW1 (P4.1) PORT4 ISR: toggles (latches) blinking ON/OFF, starts debounce
+//  - TB0 CCR1 @ 20ms: debounce timer; re-enables SW1 after ~1s
+//
+// IMPORTANT:
+//  - Do NOT call Display_Update() / SPI / LCD updates inside ISRs.
+//  - ISRs only set flags and do fast GPIO (backlight).
+//==============================================================================
+
+#include "msp430.h"
 #include "Core\lib\interupt.h"
 #include "Core\lib\display.h"
 #include "Core\lib\ports.h"
 #include "Core\lib\timers.h"
-#include "msp430.h"
 
 // ------------------- display timing flags (must exist somewhere) -------------
-extern volatile unsigned char update_display;     // set in timer ISR
-extern volatile unsigned char display_changed;    // set when text changes
+extern volatile unsigned char update_display;     // set in CCR0 ISR
+extern volatile unsigned char display_changed;    // set when text changes (elsewhere)
 
 // ------------------- switch debounce globals --------------------------------
 volatile unsigned char sw1_pressed     = 0;
@@ -17,9 +30,11 @@ volatile unsigned int  sw1_db_count    = 0;
 volatile unsigned int Time_Sequence = 0;
 volatile char one_time = 0;
 
-// ------------------- backlight control --------------------------------------
-static volatile unsigned char backlight_enabled = 1;
-static volatile unsigned char backlight_state   = 0;
+// ------------------- backlight control (LATCHED TOGGLE) ---------------------
+// blink_latched: user mode toggled by SW1
+// backlight_state: actual output state (0/1)
+static volatile unsigned char blink_latched   = 1;  // 1=blink enabled, 0=latched OFF
+static volatile unsigned char backlight_state = 0;
 
 // Timer intervals MUST match timers.c (SMCLK/64)
 #define TB0CCR0_INTERVAL    (25000u)  // 200ms
@@ -27,7 +42,7 @@ static volatile unsigned char backlight_state   = 0;
 #define SW1_DEBOUNCE_TICKS  (50u)     // 50 * 20ms = 1000ms
 
 //==============================================================================
-// PORT4 ISR (SW1)
+// PORT4 ISR (SW1) - toggles blinking latch and starts debounce
 //==============================================================================
 #pragma vector=PORT4_VECTOR
 __interrupt void switch_interrupt(void)
@@ -42,14 +57,22 @@ __interrupt void switch_interrupt(void)
 
     P4IE &= ~SW1;                 // disable SW1 interrupt during debounce
 
-    // Stop blinking + force backlight OFF during debounce
-    backlight_enabled = 0;
-    backlight_state   = 0;
-    ChangeBacklight(0);
+    // --- TOGGLE (LATCH) blink mode ---
+    blink_latched ^= 1;
 
-    // IMPORTANT: Do NOT disable CCR0 entirely if you need display timing.
-    // We keep CCR0 running for update_display timing; only gate backlight.
-    // TB0CCTL0 stays enabled.
+    // Immediate user feedback:
+    // If latched OFF -> force OFF now
+    // If latched ON  -> force ON now (then CCR0 will start toggling on next ticks)
+    if (!blink_latched)
+    {
+      backlight_state = 0;
+      ChangeBacklight(0);
+    }
+    else
+    {
+      backlight_state = 1;
+      ChangeBacklight(1);
+    }
 
     // Enable CCR1 debounce tick
     TB0CCR1   = TB0R + TB0CCR1_INTERVAL;
@@ -60,9 +83,8 @@ __interrupt void switch_interrupt(void)
 
 //==============================================================================
 // TIMER0_B0_VECTOR (CCR0) - 200ms system tick
-// - sets update_display flag (Display_Process uses it)
-// - toggles backlight (fast GPIO) only when allowed
-// - updates legacy one_time / Time_Sequence
+// - sets update_display flag (Display_Process uses it in main)
+// - toggles backlight only if latched ON and not currently debouncing
 //==============================================================================
 #pragma vector = TIMER0_B0_VECTOR
 __interrupt void Timer0_B0_ISR(void)
@@ -70,8 +92,8 @@ __interrupt void Timer0_B0_ISR(void)
   // Display scheduling flag (NO SPI HERE)
   update_display = 1;
 
-  // Backlight blinking (fast, safe) unless debouncing
-  if (backlight_enabled)
+  // Backlight blinking (fast GPIO) only when allowed
+  if (blink_latched && !sw1_debouncing)
   {
     backlight_state ^= 1;
     ChangeBacklight(backlight_state);
@@ -87,6 +109,9 @@ __interrupt void Timer0_B0_ISR(void)
 
 //==============================================================================
 // TIMER0_B1_VECTOR (CCR1/CCR2/overflow) - debounce tick
+// - runs every 20ms while enabled
+// - after ~1s, re-enables SW1 interrupt and stops CCR1
+// - IMPORTANT: does NOT force blinking back ON; respects blink_latched
 //==============================================================================
 #pragma vector = TIMER0_B1_VECTOR
 __interrupt void Timer0_B1_ISR(void)
@@ -110,8 +135,13 @@ __interrupt void Timer0_B1_ISR(void)
           // Stop debounce tick
           TB0CCTL1 &= ~CCIE;
 
-          // Resume backlight blinking
-          backlight_enabled = 1;
+          // If we're latched OFF, keep it OFF (don’t resume blinking)
+          if (!blink_latched)
+          {
+            backlight_state = 0;
+            ChangeBacklight(0);
+          }
+          // If latched ON, CCR0 will continue toggling on subsequent ticks.
         }
         else
         {

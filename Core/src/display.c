@@ -90,5 +90,20 @@ void ChangeBacklight(char mode)
 
 void UpdateDisplay(void)
 {
+    update_display = 1;
+}
 
+//-----------------------------------------------------------------------------
+//  Reset_LCD()
+//  Performs hardware reset of LCD using P4.0 (RESET_LCD)
+//-----------------------------------------------------------------------------
+void Reset_LCD(void)
+{
+  // Assert reset (active low on most LCDs)
+  P4OUT &= ~RESET_LCD;      // Drive RESET low
+  __delay_cycles(80000);    // ~10ms @ 8MHz
+
+  // Release reset
+  P4OUT |= RESET_LCD;       // Drive RESET high
+  __delay_cycles(80000);    // allow LCD controller to stabilize
 }

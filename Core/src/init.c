@@ -14,18 +14,10 @@ void Init_All(void) {
 
   Init_Ports();                 // GPIO + peripheral pin mux first
   Init_Clocks();                // ACLK/SMCLK/MCLK stable
-
+  Reset_LCD();
   Init_LCD();                   // LCD + SPI must be ready BEFORE any display updates
   Init_Display_Conditions();    // Initialize display_line[] contents + display_changed
-
   Init_Timer_B0();              // Now start 200ms update_display timer
   enable_interrupts();          // Enable port interrupts (SW1/SW2 etc.)
-
-  Init_Ports();
-  Init_Clocks();
-  Init_LCD();
-  Init_Display_Conditions();
-  Init_Timer_B0();
-  enable_interrupts();     // enables P4IE/P2IE etc.
   __enable_interrupt();    // GIE last
 }

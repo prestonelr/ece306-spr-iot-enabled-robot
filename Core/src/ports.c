@@ -163,19 +163,27 @@ void Init_Port4(void){ // Configure PORT 4
 
   P4SEL0 &= ~RESET_LCD;         // Select GPIO for P4.0 (RESET_LCD) by clearing SEL0
   P4SEL1 &= ~RESET_LCD;         // Select GPIO for P4.0 (RESET_LCD) by clearing SEL1
-  P4OUT  &= ~RESET_LCD;         // Drive P4.0 (RESET_LCD) low (initial low / reset asserted)
+  P4OUT  |= RESET_LCD;         // Drive P4.0 (RESET_LCD) high
   P4DIR  |=  RESET_LCD;         // Set P4.0 (RESET_LCD) as output
 
   // ---------------------------------------------------------------------------
-  // SW1 (P4.1) - Updated config (your format/values)
+  // SW1 (P4.1) - Updated config (safe bring-up)
   // ---------------------------------------------------------------------------
+  P4IE   &= ~SW1;               // Disable SW1 interrupt during config
+  P4IFG  &= ~SW1;               // Clear any pending IFG first
+
   P4SEL0 &= ~SW1;               // SW1 set as I/O
   P4SEL1 &= ~SW1;               // SW1 set as I/O
   P4DIR  &= ~SW1;               // SW1 Direction = input
-  P4PUD  |=  SW1;               // Configure pull-up resistor SW1
+
+  P4PUD  |=  SW1;               // Configure pull-up resistor SW1 (P4OUT |= SW1)
   P4REN  |=  SW1;               // Enable pull-up resistor SW1
-  P4IES  |=  SW1;               // SW1 Hi/Lo edge interrupt
-  P4IFG  &= ~SW1;               // IFG SW1 cleared
+
+  P4IES  |=  SW1;               // SW1 Hi/Lo edge interrupt (press = 1->0)
+
+  (void)P4IN;                   // Dummy read to let input settle
+  P4IFG  &= ~SW1;               // Clear IFG again AFTER edge/pull setup
+
   P4IE   |=  SW1;               // SW1 interrupt Enabled
   // ---------------------------------------------------------------------------
 
