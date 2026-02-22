@@ -4,25 +4,24 @@
 
 SHELL = cmd.exe
 
-CG_TOOL_ROOT := C:/ti/ccs1281/ccs/tools/compiler/ti-cgt-msp430_21.6.1.LTS
+CG_TOOL_ROOT := C:/ti/ccs1280/ccs/tools/compiler/ti-cgt-msp430_21.6.1.LTS
 
 GEN_OPTS__FLAG := 
 GEN_CMDS__FLAG := 
 
 ORDERED_OBJS += \
-"./clocks.obj" \
-"./display.obj" \
-"./init.obj" \
-"./led.obj" \
 "./main.obj" \
-"./motor.obj" \
-"./ports.obj" \
-"./shape.obj" \
-"./state.obj" \
-"./system.obj" \
+"./Addon/src/led.obj" \
+"./Addon/src/shape.obj" \
 "../Compiled/LCD.obj" \
-"../Compiled/switches.obj" \
-"../Compiled/timersB0.obj" \
+"./Core/src/clocks.obj" \
+"./Core/src/display.obj" \
+"./Core/src/init.obj" \
+"./Core/src/interupt.obj" \
+"./Core/src/motor.obj" \
+"./Core/src/ports.obj" \
+"./Core/src/system.obj" \
+"./Core/src/timers.obj" \
 "../lnk_msp430fr2355.cmd" \
 $(GEN_CMDS__FLAG) \
 -lfrwp_init.a \
@@ -36,9 +35,13 @@ RMDIR := RMDIR /S/Q
 # All of the sources participating in the build are defined here
 -include sources.mk
 -include subdir_vars.mk
+-include Addon/src/subdir_vars.mk
 -include Compiled/subdir_vars.mk
+-include Core/src/subdir_vars.mk
 -include subdir_rules.mk
+-include Addon/src/subdir_rules.mk
 -include Compiled/subdir_rules.mk
+-include Core/src/subdir_rules.mk
 -include objects.mk
 
 ifneq ($(MAKECMDGOALS),clean)
@@ -135,29 +138,29 @@ endif
 
 # Add inputs and outputs from these tool invocations to the build variables 
 EXE_OUTPUTS += \
-HW3.out 
+ECE306-2026-SPR.out 
 
 EXE_OUTPUTS__QUOTED += \
-"HW3.out" 
+"ECE306-2026-SPR.out" 
 
 
 # All Target
 all: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
-	@$(MAKE) --no-print-directory -Onone "HW3.out"
+	@$(MAKE) --no-print-directory -Onone "ECE306-2026-SPR.out"
 
 # Tool invocations
-HW3.out: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
+ECE306-2026-SPR.out: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
 	@echo 'Building target: "$@"'
 	@echo 'Invoking: MSP430 Linker'
-	"C:/ti/ccs1281/ccs/tools/compiler/ti-cgt-msp430_21.6.1.LTS/bin/cl430" -vmspx --use_hw_mpy=F5 --advice:power=all --advice:hw_config=all --define=__MSP430FR2355__ --define=_FRWP_ENABLE --define=_INFO_FRWP_ENABLE -g --printf_support=minimal --diag_warning=225 --diag_wrap=off --display_error_number --silicon_errata=CPU21 --silicon_errata=CPU22 --silicon_errata=CPU40 -z -m"HW3.map" --heap_size=160 --stack_size=160 --cinit_hold_wdt=on -i"C:/ti/ccs1281/ccs/ccs_base/msp430/include" -i"C:/ti/ccs1281/ccs/ccs_base/msp430/lib/FR2xx" -i"C:/ti/ccs1281/ccs/tools/compiler/ti-cgt-msp430_21.6.1.LTS/lib" -i"C:/ti/ccs1281/ccs/tools/compiler/ti-cgt-msp430_21.6.1.LTS/include" --priority --reread_libs --define=_FRWP_ENABLE --define=_INFO_FRWP_ENABLE --diag_wrap=off --display_error_number --warn_sections --xml_link_info="HW3_linkInfo.xml" --use_hw_mpy=F5 --rom_model -o "HW3.out" $(ORDERED_OBJS)
+	"C:/ti/ccs1280/ccs/tools/compiler/ti-cgt-msp430_21.6.1.LTS/bin/cl430" -vmspx --use_hw_mpy=F5 --advice:power=all --advice:hw_config=all --define=__MSP430FR2355__ --define=_FRWP_ENABLE --define=_INFO_FRWP_ENABLE -g --printf_support=minimal --diag_warning=225 --diag_wrap=off --display_error_number --silicon_errata=CPU21 --silicon_errata=CPU22 --silicon_errata=CPU40 -z -m"ECE306-2026-SPR.map" --heap_size=160 --stack_size=160 --cinit_hold_wdt=on -i"C:/ti/ccs1280/ccs/ccs_base/msp430/include" -i"C:/ti/ccs1280/ccs/ccs_base/msp430/lib/FR2xx" -i"C:/ti/ccs1280/ccs/tools/compiler/ti-cgt-msp430_21.6.1.LTS/lib" -i"C:/ti/ccs1280/ccs/tools/compiler/ti-cgt-msp430_21.6.1.LTS/include" --priority --reread_libs --define=_FRWP_ENABLE --define=_INFO_FRWP_ENABLE --diag_wrap=off --display_error_number --warn_sections --xml_link_info="ECE306-2026-SPR_linkInfo.xml" --use_hw_mpy=F5 --rom_model -o "ECE306-2026-SPR.out" $(ORDERED_OBJS)
 	@echo 'Finished building target: "$@"'
 	@echo ' '
 
 # Other Targets
 clean:
 	-$(RM) $(EXE_OUTPUTS__QUOTED)
-	-$(RM) "clocks.obj" "display.obj" "init.obj" "led.obj" "main.obj" "motor.obj" "ports.obj" "shape.obj" "state.obj" "system.obj" 
-	-$(RM) "clocks.d" "display.d" "init.d" "led.d" "main.d" "motor.d" "ports.d" "shape.d" "state.d" "system.d" 
+	-$(RM) "main.obj" "Addon\src\led.obj" "Addon\src\shape.obj" "Core\src\clocks.obj" "Core\src\display.obj" "Core\src\init.obj" "Core\src\interupt.obj" "Core\src\motor.obj" "Core\src\ports.obj" "Core\src\system.obj" "Core\src\timers.obj" 
+	-$(RM) "main.d" "Addon\src\led.d" "Addon\src\shape.d" "Core\src\clocks.d" "Core\src\display.d" "Core\src\init.d" "Core\src\interupt.d" "Core\src\motor.d" "Core\src\ports.d" "Core\src\system.d" "Core\src\timers.d" 
 	-@echo 'Finished clean'
 	-@echo ' '
 

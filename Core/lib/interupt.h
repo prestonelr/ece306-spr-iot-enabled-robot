@@ -1,0 +1,1 @@
+#define RESET_REGISTER (0x0000)

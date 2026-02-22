@@ -9,8 +9,8 @@
 //===========================================================================
 //------------------------------------------------------------------------------
 
-#include <Include/ports.h>
-#include <Include/macros.h>
+#include <Core\lib\ports.h>
+#include <Core\lib\macros.h>
 #include  "msp430.h"
 
 //------------------------------------------------------------------------------
@@ -158,44 +158,50 @@ void Init_Port3(char PIN_3D4){ // Configure Port 3
 
 void Init_Port4(void){ // Configure PORT 4
 //------------------------------------------------------------------------------
- P4OUT = 0x00;                 // Clear ALL P4 outputs low (affects any P4 pins configured as outputs)
- P4DIR = 0x00;                 // Set ALL P4 pins as inputs initially (direction default)
+  P4OUT = 0x00;                 // Clear ALL P4 outputs low (affects any P4 pins configured as outputs)
+  P4DIR = 0x00;                 // Set ALL P4 pins as inputs initially (direction default)
 
- P4SEL0 &= ~RESET_LCD;         // Select GPIO for P4.0 (RESET_LCD) by clearing SEL0
- P4SEL1 &= ~RESET_LCD;         // Select GPIO for P4.0 (RESET_LCD) by clearing SEL1
- P4OUT &= ~RESET_LCD;          // Drive P4.0 (RESET_LCD) low (initial low / reset asserted)
- P4DIR |= RESET_LCD;           // Set P4.0 (RESET_LCD) as output
+  P4SEL0 &= ~RESET_LCD;         // Select GPIO for P4.0 (RESET_LCD) by clearing SEL0
+  P4SEL1 &= ~RESET_LCD;         // Select GPIO for P4.0 (RESET_LCD) by clearing SEL1
+  P4OUT  &= ~RESET_LCD;         // Drive P4.0 (RESET_LCD) low (initial low / reset asserted)
+  P4DIR  |=  RESET_LCD;         // Set P4.0 (RESET_LCD) as output
 
- P4SEL0 &= ~SW1;               // Select GPIO for P4.1 (SW1) by clearing SEL0
- P4SEL1 &= ~SW1;               // Select GPIO for P4.1 (SW1) by clearing SEL1
- P4OUT |= SW1;                 // Set P4.1 OUT high to choose pull-up when REN enabled
- P4DIR &= ~SW1;                // Set P4.1 (SW1) as input
- P4REN |= SW1;                 // Enable resistor on P4.1 (SW1) (with OUT=1 => pull-up)
+  // ---------------------------------------------------------------------------
+  // SW1 (P4.1) - Updated config (your format/values)
+  // ---------------------------------------------------------------------------
+  P4SEL0 &= ~SW1;               // SW1 set as I/O
+  P4SEL1 &= ~SW1;               // SW1 set as I/O
+  P4DIR  &= ~SW1;               // SW1 Direction = input
+  P4PUD  |=  SW1;               // Configure pull-up resistor SW1
+  P4REN  |=  SW1;               // Enable pull-up resistor SW1
+  P4IES  |=  SW1;               // SW1 Hi/Lo edge interrupt
+  P4IFG  &= ~SW1;               // IFG SW1 cleared
+  P4IE   |=  SW1;               // SW1 interrupt Enabled
+  // ---------------------------------------------------------------------------
 
- P4SEL0 |= UCA1TXD;            // Select UART function for P4.3 (UCA1TXD) by setting SEL0
- P4SEL1 &= ~UCA1TXD;           // Select UART function for P4.3 (UCA1TXD) by clearing SEL1
+  P4SEL0 |=  UCA1TXD;           // Select UART function for P4.3 (UCA1TXD) by setting SEL0
+  P4SEL1 &= ~UCA1TXD;           // Select UART function for P4.3 (UCA1TXD) by clearing SEL1
                                // (Direction is handled by UART peripheral)
 
- P4SEL0 |= UCA1RXD;            // Select UART function for P4.2 (UCA1RXD) by setting SEL0
- P4SEL1 &= ~UCA1RXD;           // Select UART function for P4.2 (UCA1RXD) by clearing SEL1
+  P4SEL0 |=  UCA1RXD;           // Select UART function for P4.2 (UCA1RXD) by setting SEL0
+  P4SEL1 &= ~UCA1RXD;           // Select UART function for P4.2 (UCA1RXD) by clearing SEL1
                                // (Direction is handled by UART peripheral)
 
- P4SEL0 &= ~UCB1_CS_LCD;       // Select GPIO for P4.4 (UCB1_CS_LCD) by clearing SEL0
- P4SEL1 &= ~UCB1_CS_LCD;       // Select GPIO for P4.4 (UCB1_CS_LCD) by clearing SEL1
- P4OUT |= UCB1_CS_LCD;         // Drive P4.4 (UCB1_CS_LCD) high (CS inactive)
- P4DIR |= UCB1_CS_LCD;         // Set P4.4 (UCB1_CS_LCD) as output
+  P4SEL0 &= ~UCB1_CS_LCD;       // Select GPIO for P4.4 (UCB1_CS_LCD) by clearing SEL0
+  P4SEL1 &= ~UCB1_CS_LCD;       // Select GPIO for P4.4 (UCB1_CS_LCD) by clearing SEL1
+  P4OUT  |=  UCB1_CS_LCD;       // Drive P4.4 (UCB1_CS_LCD) high (CS inactive)
+  P4DIR  |=  UCB1_CS_LCD;       // Set P4.4 (UCB1_CS_LCD) as output
 
- P4SEL0 |= UCB1CLK;            // Select SPI function for P4.5 (UCB1CLK) by setting SEL0
- P4SEL1 &= ~UCB1CLK;           // Select SPI function for P4.5 (UCB1CLK) by clearing SEL1
+  P4SEL0 |=  UCB1CLK;           // Select SPI function for P4.5 (UCB1CLK) by setting SEL0
+  P4SEL1 &= ~UCB1CLK;           // Select SPI function for P4.5 (UCB1CLK) by clearing SEL1
 
- P4SEL0 |= UCB1SIMO;           // Select SPI function for P4.6 (UCB1SIMO) by setting SEL0
- P4SEL1 &= ~UCB1SIMO;          // Select SPI function for P4.6 (UCB1SIMO) by clearing SEL1
+  P4SEL0 |=  UCB1SIMO;          // Select SPI function for P4.6 (UCB1SIMO) by setting SEL0
+  P4SEL1 &= ~UCB1SIMO;          // Select SPI function for P4.6 (UCB1SIMO) by clearing SEL1
 
- P4SEL0 |= UCB1SOMI;           // Select SPI function for P4.7 (UCB1SOMI) by setting SEL0
- P4SEL1 &= ~UCB1SOMI;          // Select SPI function for P4.7 (UCB1SOMI) by clearing SEL1
+  P4SEL0 |=  UCB1SOMI;          // Select SPI function for P4.7 (UCB1SOMI) by setting SEL0
+  P4SEL1 &= ~UCB1SOMI;          // Select SPI function for P4.7 (UCB1SOMI) by clearing SEL1
 //------------------------------------------------------------------------------
 }
-
 
 
 //------------------------------------------------------------------------------
@@ -238,7 +244,7 @@ void Init_Port6(void){ // Configure Port 6
 
  P6SEL0 &= ~LCD_BACKLITE;      // Select GPIO for P6.0 (LCD_BACKLITE) by clearing SEL0
  P6SEL1 &= ~LCD_BACKLITE;      // Select GPIO for P6.0 (LCD_BACKLITE) by clearing SEL1
- P6OUT  |= LCD_BACKLITE;      // Drive P6.0 (LCD_BACKLITE) low (backlight off)
+ P6OUT &= ~LCD_BACKLITE;        // Set P6.0  OFF at boot
  P6DIR  |=  LCD_BACKLITE;      // Set P6.0 (LCD_BACKLITE) as output
 
  P6SEL0 &= ~R_FORWARD;         // Select GPIO for P6.1 (R_FORWARD) by clearing SEL0

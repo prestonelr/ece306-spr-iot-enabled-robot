@@ -9,75 +9,21 @@ CMD_SRCS += \
 ../lnk_msp430fr2355.cmd 
 
 C_SRCS += \
-../clocks.c \
-../display.c \
-../init.c \
-../led.c \
-../main.c \
-../motor.c \
-../ports.c \
-../shape.c \
-../state.c \
-../system.c 
+../main.c 
 
 C_DEPS += \
-./clocks.d \
-./display.d \
-./init.d \
-./led.d \
-./main.d \
-./motor.d \
-./ports.d \
-./shape.d \
-./state.d \
-./system.d 
+./main.d 
 
 OBJS += \
-./clocks.obj \
-./display.obj \
-./init.obj \
-./led.obj \
-./main.obj \
-./motor.obj \
-./ports.obj \
-./shape.obj \
-./state.obj \
-./system.obj 
+./main.obj 
 
 OBJS__QUOTED += \
-"clocks.obj" \
-"display.obj" \
-"init.obj" \
-"led.obj" \
-"main.obj" \
-"motor.obj" \
-"ports.obj" \
-"shape.obj" \
-"state.obj" \
-"system.obj" 
+"main.obj" 
 
 C_DEPS__QUOTED += \
-"clocks.d" \
-"display.d" \
-"init.d" \
-"led.d" \
-"main.d" \
-"motor.d" \
-"ports.d" \
-"shape.d" \
-"state.d" \
-"system.d" 
+"main.d" 
 
 C_SRCS__QUOTED += \
-"../clocks.c" \
-"../display.c" \
-"../init.c" \
-"../led.c" \
-"../main.c" \
-"../motor.c" \
-"../ports.c" \
-"../shape.c" \
-"../state.c" \
-"../system.c" 
+"../main.c" 
 
 

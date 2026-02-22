@@ -8,8 +8,8 @@
 //------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
-#include <Include/functions.h>
-#include <Include/macros.h>
+#include <Core\lib\functions.h>
+#include <Core\lib\macros.h>
 #include  "msp430.h"
 
 void enable_interrupts(void);

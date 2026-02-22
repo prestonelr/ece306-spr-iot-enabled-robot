@@ -8,18 +8,18 @@
 // Compiler: Built with Code Composer Version: CCS12.4.0.00007_win64
 //===========================================================================
 
-#include <Include/macros.h>
-#include  "Include\functions.h"
+#include <Core\lib\macros.h>
+#include  "Core\lib\functions.h"
 #include  "msp430.h"
 #include <string.h>
-#include  "Include\LCD.h"
-
+#include  "Core\lib\LCD.h"
+#include "Core\lib\ports.h"
 
 extern char display_line[4][11];
 extern char *display[4];
 extern volatile unsigned char display_changed;
 extern volatile unsigned char update_display;
-extern volatile unsigned int update_display_count;
+
 
 
 void Display_Process(void){
@@ -69,9 +69,26 @@ void ChangeDisplay(char *text, int row)
 {
     strcpy(display_line[row], text);
     display_changed = 1;
-
 }
 
 
 
+//-----------------------------------------------------------------------------
+//  ChangeBacklight()
+//  mode: 0 = OFF
+//        1 = ON
+//-----------------------------------------------------------------------------
+void ChangeBacklight(char mode)
+{
+  if(mode){
+      P6OUT |= LCD_BACKLITE;   // Turn ON
+  }
+  else{
+      P6OUT &= ~LCD_BACKLITE;  // Turn OFF
+  }
+}
 
+void UpdateDisplay(void)
+{
+
+}

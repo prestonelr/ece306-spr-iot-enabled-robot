@@ -18,3 +18,7 @@
 #define TRUE                 (0x01) //
 
 int SMCLK_CONFIG; // uses gpio by default
+
+
+#define P4PUD (P4OUT) // interupts
+#define RESET_REGISTER (0x00)

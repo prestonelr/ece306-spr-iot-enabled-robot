@@ -1,10 +1,12 @@
+
+
 #include <msp430.h>
 #include <string.h>
-#include "Include\display.h"
-#include "Include\motor.h"
-#include "Include\ports.h"
-#include "Include\macros.h"
-#include "Include\shape.h"
+#include "Core\lib\display.h"
+#include "Core\lib\motor.h"
+#include "Core\lib\ports.h"
+#include "Core\lib\macros.h"
+#include "Addon\lib\shape.h"
 
 void ShapeUI_Init(void)
 {
@@ -104,3 +106,4 @@ void ShapeUI_Task(void)
         }
     }
 }
+

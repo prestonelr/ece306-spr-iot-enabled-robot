@@ -11,3 +11,5 @@
 void Init_Display_Conditions(void); //init display to default state
 void Display_Process(void); // updating the display
 void ChangeDisplay(char *text, int row); // changes the display_changed variable to x.
+void ChangeBacklight(char mode);
+void UpdateDisplay(void); // sets update_display to 1

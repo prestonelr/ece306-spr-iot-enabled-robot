@@ -10,8 +10,8 @@
 
 
 
-#include "Include\motor.h"
-#include "Include\ports.h"
+#include "Core\lib\motor.h"
+#include "Core\lib\ports.h"
 #include  "msp430.h"
 
 

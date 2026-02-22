@@ -6,8 +6,6 @@ SHELL = cmd.exe
 
 # Add inputs and outputs from these tool invocations to the build variables 
 OBJ_SRCS += \
-../Compiled/LCD.obj \
-../Compiled/switches.obj \
-../Compiled/timersB0.obj 
+../Compiled/LCD.obj 
 
 
