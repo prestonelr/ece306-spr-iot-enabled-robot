@@ -11,7 +11,7 @@
 //------------------------------------------------------------------------------
 #include  "Core\core.h"
 #include "Addon\lib\led.h"
-
+#include "Addon\lib\shape.h"
 
 
 
@@ -21,10 +21,12 @@ void main(void){
 
   SMCLK_CONFIG = USE_SMCLK; // USE_GPIO or USE_SMCLK
   Init_All();
+  Shape_Init();
 
 //------------------------------------------------------------------------------
   while(ALWAYS) {                      // Can the Operating system run
     Carlson_StateMachine();            // Run a Time Based State Machine
+    Shape_Task();
     Display_Process();                 // Update Display
     //P3OUT ^= TEST_PROBE;               // Change State of TEST_PROBE OFF
   }
