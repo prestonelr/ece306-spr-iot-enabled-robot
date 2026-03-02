@@ -15,6 +15,7 @@ void Init_All(void) {
   Init_Ports();                 // GPIO + peripheral pin mux first
   Init_Clocks();                // ACLK/SMCLK/MCLK stable
   Reset_LCD();
+  Init_ADC();
   Init_LCD();                   // LCD + SPI must be ready BEFORE any display updates
   Init_Display_Conditions();    // Initialize display_line[] contents + display_changed
   Init_Timer_B0();              // Now start 200ms update_display timer

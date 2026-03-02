@@ -57,24 +57,6 @@ __interrupt void switch_interrupt(void)
 
     P4IE &= ~SW1;                 // disable SW1 interrupt during debounce
 
-    // --- TOGGLE (LATCH) blink mode ---
-    blink_latched ^= 1;
-
-    // Immediate user feedback:
-    // If latched OFF -> force OFF now
-    // If latched ON  -> force ON now (then CCR0 will start toggling on next ticks)
-    if (!blink_latched)
-    {
-      backlight_state = 0;
-      ChangeBacklight(0);
-    }
-    else
-    {
-      backlight_state = 1;
-      ChangeBacklight(1);
-    }
-
-    // Enable CCR1 debounce tick
     TB0CCR1   = TB0R + TB0CCR1_INTERVAL;
     TB0CCTL1 &= ~CCIFG;
     TB0CCTL1 |= CCIE;
@@ -91,13 +73,6 @@ __interrupt void Timer0_B0_ISR(void)
 {
   // Display scheduling flag (NO SPI HERE)
   update_display = 1;
-
-  // Backlight blinking (fast GPIO) only when allowed
-  if (blink_latched && !sw1_debouncing)
-  {
-    backlight_state ^= 1;
-    ChangeBacklight(backlight_state);
-  }
 
   // Legacy timing flags (if other code depends on them)
   one_time = 1;
@@ -135,13 +110,6 @@ __interrupt void Timer0_B1_ISR(void)
           // Stop debounce tick
           TB0CCTL1 &= ~CCIE;
 
-          // If we're latched OFF, keep it OFF (don’t resume blinking)
-          if (!blink_latched)
-          {
-            backlight_state = 0;
-            ChangeBacklight(0);
-          }
-          // If latched ON, CCR0 will continue toggling on subsequent ticks.
         }
         else
         {

@@ -18,8 +18,8 @@ main.obj: C:/Users/prest/Documents/GitHub/ece306-spr-iot-enabled-robot/Core/lib/
 main.obj: C:/Users/prest/Documents/GitHub/ece306-spr-iot-enabled-robot/Core/lib/timers.h
 main.obj: C:/Users/prest/Documents/GitHub/ece306-spr-iot-enabled-robot/Core/lib/interupt.h
 main.obj: C:/Users/prest/Documents/GitHub/ece306-spr-iot-enabled-robot/Core/lib/init.h
+main.obj: C:/Users/prest/Documents/GitHub/ece306-spr-iot-enabled-robot/Core/lib/adc.h
 main.obj: ../Addon/lib/led.h
-main.obj: ../Addon/lib/shape.h
 
 ../main.c:
 
@@ -57,7 +57,7 @@ C:/Users/prest/Documents/GitHub/ece306-spr-iot-enabled-robot/Core/lib/interupt.h
 
 C:/Users/prest/Documents/GitHub/ece306-spr-iot-enabled-robot/Core/lib/init.h:
 
-../Addon/lib/led.h:
+C:/Users/prest/Documents/GitHub/ece306-spr-iot-enabled-robot/Core/lib/adc.h:
 
-../Addon/lib/shape.h:
+../Addon/lib/led.h:
 

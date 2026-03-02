@@ -9,3 +9,4 @@
 #include "Core\lib\timers.h"
 #include "Core\lib\interupt.h"
 #include "Core\lib\init.h"
+#include "Core\lib\adc.h"

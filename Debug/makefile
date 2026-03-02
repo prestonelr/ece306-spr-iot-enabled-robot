@@ -14,7 +14,9 @@ ORDERED_OBJS += \
 "./Addon/src/led.obj" \
 "./Addon/src/shape.obj" \
 "../Compiled/LCD.obj" \
+"./Core/src/adc.obj" \
 "./Core/src/clocks.obj" \
+"./Core/src/dac.obj" \
 "./Core/src/display.obj" \
 "./Core/src/init.obj" \
 "./Core/src/interupt.obj" \
@@ -159,8 +161,8 @@ ECE306-2026-SPR.out: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
 # Other Targets
 clean:
 	-$(RM) $(EXE_OUTPUTS__QUOTED)
-	-$(RM) "main.obj" "Addon\src\led.obj" "Addon\src\shape.obj" "Core\src\clocks.obj" "Core\src\display.obj" "Core\src\init.obj" "Core\src\interupt.obj" "Core\src\motor.obj" "Core\src\ports.obj" "Core\src\system.obj" "Core\src\timers.obj" 
-	-$(RM) "main.d" "Addon\src\led.d" "Addon\src\shape.d" "Core\src\clocks.d" "Core\src\display.d" "Core\src\init.d" "Core\src\interupt.d" "Core\src\motor.d" "Core\src\ports.d" "Core\src\system.d" "Core\src\timers.d" 
+	-$(RM) "main.obj" "Addon\src\led.obj" "Addon\src\shape.obj" "Core\src\adc.obj" "Core\src\clocks.obj" "Core\src\dac.obj" "Core\src\display.obj" "Core\src\init.obj" "Core\src\interupt.obj" "Core\src\motor.obj" "Core\src\ports.obj" "Core\src\system.obj" "Core\src\timers.obj" 
+	-$(RM) "main.d" "Addon\src\led.d" "Addon\src\shape.d" "Core\src\adc.d" "Core\src\clocks.d" "Core\src\dac.d" "Core\src\display.d" "Core\src\init.d" "Core\src\interupt.d" "Core\src\motor.d" "Core\src\ports.d" "Core\src\system.d" "Core\src\timers.d" 
 	-@echo 'Finished clean'
 	-@echo ' '
 

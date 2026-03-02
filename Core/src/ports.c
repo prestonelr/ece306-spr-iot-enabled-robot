@@ -69,12 +69,12 @@ void Init_Port2(void){ // Configure Port 2
 
  P2SEL0 &= ~CHECK_BAT;         // Select GPIO for P2.1 (CHECK_BAT) by clearing SEL0
  P2SEL1 &= ~CHECK_BAT;         // Select GPIO for P2.1 (CHECK_BAT) by clearing SEL1
- P2OUT &= ~CHECK_BAT;          // Drive P2.1 (CHECK_BAT) low (initial low)
+ P2OUT |= CHECK_BAT;          // Drive P2.1 (CHECK_BAT) low (initial low)
  P2DIR |= CHECK_BAT;           // Set P2.1 (CHECK_BAT) as output
 
  P2SEL0 &= ~IR_LED;            // Select GPIO for P2.2 (IR_LED) by clearing SEL0
  P2SEL1 &= ~IR_LED;            // Select GPIO for P2.2 (IR_LED) by clearing SEL1
- P2OUT &= ~IR_LED;             // Drive P2.2 (IR_LED) low (IR LED off)
+ P2OUT |= IR_LED;             // Drive P2.2 (IR_LED) low (IR LED off)
  P2DIR |= IR_LED;              // Set P2.2 (IR_LED) as output
 
  P2SEL0 &= ~SW2;               // Select GPIO for P2.3 (SW2) by clearing SEL0
