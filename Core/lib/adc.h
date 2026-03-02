@@ -4,12 +4,15 @@
 // Description: Simple ADC driver for MSP430FR2355
 //              - Blocking single channel read
 //              - Direct millivolt output
-//              - Includes Battery input (P5.0 / A8) with divider correction
+//              - Battery channel includes divider correction inside
+//                ADC_ReadMilliVolts()
 //
 // Author: Preston Elrod
 // Date: Feb 2026
 //===========================================================================
 
+#ifndef __ADC_H__
+#define __ADC_H__
 
 // ---------------- ADC CHANNEL DEFINES ----------------
 // P1.2 = A2 = V_DETECT_L
@@ -35,9 +38,12 @@
 void Init_ADC(void);
 
 unsigned ADC_ReadChannel(unsigned channel);
+
+/*
+ * Returns millivolts.
+ * - For normal channels: returns ADC pin millivolts.
+ * - For ADC_CH_BAT: returns corrected VBAT millivolts (divider compensated).
+ */
 unsigned ADC_ReadMilliVolts(unsigned channel);
 
-// Returns ACTUAL battery voltage (VBAT) in millivolts, corrected for divider
-unsigned ADC_ReadBatteryMilliVolts(void);
-
-
+#endif /* __ADC_H__ */

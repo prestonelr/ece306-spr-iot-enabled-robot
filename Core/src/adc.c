@@ -4,7 +4,7 @@
 // Description: Simple blocking ADC driver
 //              Uses AVCC as reference
 //              Returns raw value or millivolts
-//              Battery reading includes divider correction
+//
 //
 // Author: Preston Elrod
 // Date: Feb 2026
@@ -25,13 +25,6 @@ void Init_ADC(void)
     P1OUT &= ~(V_DETECT_L | V_DETECT_R | V_THUMB);
     P1SELC |=  (V_DETECT_L | V_DETECT_R | V_THUMB);
 
-    // NOTE: If your battery sense pin is on P5.0 (A8), configure it too.
-    // Some projects handle P5 analog select elsewhere; leaving this comment
-    // so you can enable if needed:
-    //
-    // P5DIR &= ~BIT0;
-    // P5OUT &= ~BIT0;
-    // P5SELC |= BIT0;
 
     // --- Disable ADC before config ---
     ADCCTL0 &= ~ADCENC;
@@ -59,8 +52,6 @@ void Init_ADC(void)
     // --- Memory Control ---
     ADCMCTL0 = 0;
     ADCMCTL0 |= ADCSREF_0;   // VR+ = AVCC, VR- = AVSS
-
-    // ADC ready
 }
 
 //===========================================================================
@@ -89,39 +80,26 @@ unsigned ADC_ReadChannel(unsigned channel)
 
 //===========================================================================
 // ADC_ReadMilliVolts
-// Returns voltage in millivolts at the ADC pin
-// Formula: V = (ADC * Vref) / 4095
+// Returns millivolts.
+// Normal channels: millivolts at ADC pin
+// Battery channel (ADC_CH_BAT): returns corrected VBAT millivolts
+//
+// Formula at pin: Vnode = (ADC * Vref) / 4095
+// Divider: VBAT = Vnode * ((RTOP + RBOT) / RBOT)
 //===========================================================================
 unsigned ADC_ReadMilliVolts(unsigned channel)
 {
-    unsigned long temp;
+    unsigned long mv;
 
-    temp = ADC_ReadChannel(channel);
-    temp = temp * ADC_VREF_MV;
-    temp = temp / 4095;          // 12-bit full scale
+    mv = (unsigned long)ADC_ReadChannel(channel);
+    mv = mv * (unsigned long)ADC_VREF_MV;
+    mv = mv / 4095UL;  // 12-bit full scale
 
-    return (unsigned)temp;
-}
+    // Special case: battery divider correction
+    if (channel == (unsigned)ADC_CH_BAT) {
+        mv = mv * (VBAT_DIV_RTOP_OHMS + VBAT_DIV_RBOT_OHMS);
+        mv = mv / VBAT_DIV_RBOT_OHMS;
+    }
 
-//===========================================================================
-// ADC_ReadBatteryMilliVolts
-// Battery sense is through divider:
-//   VBAT -> RTOP -> node -> RBOT -> GND
-// node = VBAT * (RBOT / (RTOP + RBOT))
-// VBAT = node * ((RTOP + RBOT) / RBOT)
-//
-// Returns corrected VBAT in millivolts
-//===========================================================================
-unsigned ADC_ReadBatteryMilliVolts(void)
-{
-    unsigned long node_mv;
-    unsigned long vbat_mv;
-
-    node_mv = ADC_ReadMilliVolts(ADC_CH_BAT);
-
-    // vbat_mv = node_mv * (RTOP + RBOT) / RBOT
-    vbat_mv = node_mv * (VBAT_DIV_RTOP_OHMS + VBAT_DIV_RBOT_OHMS);
-    vbat_mv = vbat_mv / VBAT_DIV_RBOT_OHMS;
-
-    return (unsigned)vbat_mv;
+    return (unsigned)mv;
 }
