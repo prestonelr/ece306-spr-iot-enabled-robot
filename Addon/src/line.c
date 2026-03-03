@@ -1,12 +1,26 @@
 //===========================================================================
 // File Name : line.c
 //
-// Description:
-//   Simple LEFT-only line test (right detector broken)
-//   - SW1 captures WHITE/BLACK values (OFF then ON)
-//   - TA test: SW1 -> 1s delay -> forward until black -> stop -> turn to black
+// Project-specific:
+//   SW1 #1: capture WHITE (motors OFF)
+//   SW1 #2: capture BLACK (motors OFF)
+//   SW1 #3: START (then motors allowed)
 //
-// Old-compiler friendly: no floats, no snprintf, no malloc, no uint types
+// Run:
+//   1) Forward until black detected (either sensor)
+//   2) Reverse slowly until it leaves line (both white) then hits black again
+//   3) Tank-turn FAST until the line is LOST (both sensors white for a few hits)
+//   4) Then tank-turn SLOW in the OPPOSITE direction to come back on top
+//      of the line (BOTH sensors black)
+//   5) Stop
+//
+// Requirements kept:
+//   - Real-time motor control (call Line_Task fast)
+//   - Tank turning (one wheel fwd, one wheel rev)
+//   - 50ms dead-time anytime a wheel reverses (forward<->reverse)
+//   - No new timers: use TB0R as timebase
+//   - ADC values displayed at all times
+//   - Uses motor.h (no local motor_* defines)
 //===========================================================================
 
 #include <msp430.h>
@@ -17,281 +31,395 @@
 #include "Core\lib\motor.h"
 #include "Addon\lib\line.h"
 
-// 200ms tick
-extern volatile unsigned int Time_Sequence;
-
-// switch debounce globals (provided by you)
+// switch debounce globals
 extern volatile unsigned char sw1_pressed;
-extern volatile unsigned char sw1_debouncing;
-extern volatile unsigned int  sw1_db_count;
+extern volatile unsigned char update_display;
 
-#define TICKS_1S   (5u)
-#define TICKS_4S   (20u)
+// -------------------- TB0 timing -------------------------------------------
+// TB0 tick = 8us => 125 ticks per ms (based on 2500 ticks ~ 20ms)
+#define TB0_TICKS_PER_MS   (125u)
+#define DEADTIME_MS        (50u)
+#define DEADTIME_TICKS     (DEADTIME_MS * TB0_TICKS_PER_MS)
 
-// -------- emitter control (IR_LED) --------
-// If active-low, invert these.
+// Software PWM using TB0R phase (no extra timers)
+#define PWM_PERIOD_TICKS   (2500u)   // ~20ms
+#define REV_SLOW_DUTY_PCT  (30u)
+
+// Turn behavior
+#define TURN_FAST_DUTY_PCT (70u)     // spin to lose the line
+#define TURN_SLOW_DUTY_PCT (35u)     // creep back onto the line
+
+#define STABLE_HITS        (3u)
+
+// -------------------- Emitter ----------------------------------------------
 static void Emitter_On(void)
 {
   P2DIR |= IR_LED;
   P2OUT |= IR_LED;
 }
-static void Emitter_Off(void)
+
+static const char* EmitterText(void)
 {
-  P2DIR |= IR_LED;
-  P2OUT &= ~IR_LED;
+  return "EMIT  ON ";
 }
 
-static const char* EmitterText(unsigned char on)
-{
-  return on ? "EMIT  ON " : "EMIT OFF ";
-}
+// -------------------- Display helpers (always show ADC) --------------------
+static char g_lineL[11];
+static char g_lineR[11];
 
-// -------- tiny number line "L:   ####" --------
-static char g_line[11];
-
-static char* MakeLeftLine(unsigned v)
+static char* MakeLine(const char label, unsigned v, char* buf)
 {
   int i;
 
-  for(i=0;i<10;i++) g_line[i] = ' ';
-  g_line[10] = 0;
+  for(i=0;i<10;i++) buf[i] = ' ';
+  buf[10] = 0;
 
-  g_line[0] = 'L';
-  g_line[1] = ':';
+  buf[0] = label;
+  buf[1] = ':';
 
   i = 9;
-  if(v == 0u)
-  {
-    g_line[i] = '0';
-    return g_line;
-  }
+  if(v == 0u) { buf[i] = '0'; return buf; }
 
   while((v > 0u) && (i >= 2))
   {
-    g_line[i] = (char)('0' + (v % 10u));
+    buf[i] = (char)('0' + (v % 10u));
     v /= 10u;
     i--;
   }
-
-  return g_line;
+  return buf;
 }
 
-// -------- stored capture values (LEFT only) --------
-static unsigned white_off = 0;
-static unsigned black_off = 0;
-static unsigned white_on  = 0;
-static unsigned black_on  = 0;
-
-static unsigned char have_white_off = 0;
-static unsigned char have_black_off = 0;
-static unsigned char have_white_on  = 0;
-static unsigned char have_black_on  = 0;
-
-// threshold between stored white and black
-// thr = white + (black-white)*3/5  (60% toward black)
-static unsigned MakeThresh(unsigned white, unsigned black)
+static void DisplayAlways(unsigned L, unsigned R)
 {
-  long dw;
-  long t;
+  ChangeDisplay(EmitterText(),             0);
+  ChangeDisplay(MakeLine('L', L, g_lineL), 1);
+  ChangeDisplay(MakeLine('R', R, g_lineR), 2);
+}
 
-  dw = (long)black - (long)white;
-  t  = (long)white + (dw * 3L) / 5L;
+// -------------------- TB0R wait (wrap safe) --------------------------------
+static void Wait_TB0Ticks(unsigned ticks)
+{
+  unsigned start = (unsigned)TB0R;
+  while((unsigned)(TB0R - start) < ticks) { ; }
+}
 
+// -------------------- Safe motor set w/ dead-time on reversal --------------
+static int last_dir_L = motor_off;
+static int last_dir_R = motor_off;
+
+static void SafeSetWheel(int wheel, int desired_dir)
+{
+  int *plast;
+  int last;
+
+  plast = (wheel == motor_left) ? &last_dir_L : &last_dir_R;
+  last  = *plast;
+
+  if( (last == motor_forward && desired_dir == motor_reverse) ||
+      (last == motor_reverse && desired_dir == motor_forward) )
+  {
+    ChangeWheelDirection(wheel, motor_off);
+    Wait_TB0Ticks(DEADTIME_TICKS);
+  }
+
+  ChangeWheelDirection(wheel, desired_dir);
+  *plast = desired_dir;
+}
+
+static void DriveLR(int left_dir, int right_dir)
+{
+  SafeSetWheel(motor_left,  left_dir);
+  SafeSetWheel(motor_right, right_dir);
+}
+
+static void StopAll_Hard(void)
+{
+  ChangeWheelDirection(motor_left,  motor_off);
+  ChangeWheelDirection(motor_right, motor_off);
+  last_dir_L = motor_off;
+  last_dir_R = motor_off;
+}
+
+static void DriveLR_PWM(int left_dir, int right_dir, unsigned duty_pct)
+{
+  unsigned on_ticks;
+  unsigned phase;
+
+  if(duty_pct >= 100u) { DriveLR(left_dir, right_dir); return; }
+  if(duty_pct == 0u)   { DriveLR(motor_off, motor_off); return; }
+
+  on_ticks = (unsigned)((PWM_PERIOD_TICKS * duty_pct) / 100u);
+  phase = (unsigned)((unsigned)TB0R % PWM_PERIOD_TICKS);
+
+  if(phase < on_ticks) DriveLR(left_dir, right_dir);
+  else                 DriveLR(motor_off, motor_off);
+}
+
+// -------------------- Calibration ------------------------------------------
+static unsigned whiteL = 0, whiteR = 0;
+static unsigned blackL = 0, blackR = 0;
+static unsigned char have_white = 0;
+static unsigned char have_black = 0;
+
+static unsigned MakeMidThresh(unsigned w, unsigned b)
+{
+  long t = (long)w + ((long)b - (long)w) / 2L;
   if(t < 0) t = 0;
   if(t > 65535) t = 65535;
   return (unsigned)t;
 }
 
-static unsigned IsBlack_Left(unsigned left_now)
+static unsigned IsBlack(unsigned now, unsigned w, unsigned b)
 {
-  unsigned thr;
-
-  // Use emitter ON captures for TA run
-  if(!have_white_on || !have_black_on) return 0u;
-
-  thr = MakeThresh(white_on, black_on);
-
-  // If black_on < white_on (reversed), the threshold logic still works because dw is negative.
-  // In that case, being "black" means <= thr instead of >= thr.
-  if(black_on >= white_on)
-    return (left_now >= thr);
-  else
-    return (left_now <= thr);
+  unsigned thr = MakeMidThresh(w, b);
+  if(b >= w) return (now >= thr);
+  else       return (now <= thr);
 }
 
-// -------- modes / steps --------
+// -------------------- States ------------------------------------------------
 typedef enum
 {
-  MODE_MANUAL = 0,
-  MODE_AUTO_READY,
-  MODE_AUTO_DELAY,
-  MODE_AUTO_FORWARD,
-  MODE_AUTO_STOP,
-  MODE_AUTO_TURN,
-  MODE_AUTO_DONE
-} mode_t;
+  ST_CAL_WHITE = 0,
+  ST_CAL_BLACK,
+  ST_CAL_READY,
 
-static mode_t mode = MODE_MANUAL;
-static unsigned char emitter_on_state = 0;
-static unsigned char step = 0;
-static unsigned mode_ticks = 0;
+  ST_RUN_FWD,
+  ST_RUN_REV,
 
-static void SetMode(mode_t m)
-{
-  mode = m;
-  mode_ticks = 0;
-}
+  ST_TURN_LOSE,     // fast tank-turn until line is LOST (both white stable)
+  ST_TURN_CORRECT,  // slow tank-turn in OPPOSITE direction until BOTH black
 
+  ST_DONE
+} state_t;
+
+static state_t st = ST_CAL_WHITE;
+
+static unsigned stable_count = 0;
+static unsigned char rev_seen_white = 0;
+
+// 0=turn left, 1=turn right
+static unsigned char turn_dir = 0;
+
+// correction direction is opposite of turn_dir
+static unsigned char corr_dir = 0;
+
+// -------------------- Init --------------------------------------------------
 void Line_Init(void)
 {
-  have_white_off = have_black_off = 0;
-  have_white_on  = have_black_on  = 0;
+  sw1_pressed = 0;
 
-  emitter_on_state = 0;
-  Emitter_Off();
+  StopAll_Hard();
 
-  step = 0;
-  SetMode(MODE_MANUAL);
+  have_white = 0;
+  have_black = 0;
+  st = ST_CAL_WHITE;
 
-  ChangeDisplay("LINE LEFT", 0);
-  ChangeDisplay("SW1 CAP  ", 1);
-  ChangeDisplay(" ",        2);
-  ChangeDisplay(" ",        3);
+  stable_count = 0;
+  rev_seen_white = 0;
+  turn_dir = 0;
+  corr_dir = 0;
+
+  Emitter_On();
+
+  ChangeDisplay("LINE ROUTE", 0);
+  ChangeDisplay(" ",          1);
+  ChangeDisplay(" ",          2);
+  ChangeDisplay("WHITE->SW1", 3);
 }
 
-static void ManualPrompt(void)
-{
-  switch(step)
-  {
-    case 0: ChangeDisplay("OFF->WHITE", 3); break;
-    case 1: ChangeDisplay("CAP WHITE ", 3); break;
-    case 2: ChangeDisplay("OFF->BLACK", 3); break;
-    case 3: ChangeDisplay("CAP BLACK ", 3); break;
-    case 4: ChangeDisplay("EMIT ON   ", 3); break;
-    case 5: ChangeDisplay("ON->WHITE ", 3); break;
-    case 6: ChangeDisplay("CAP WHITE ", 3); break;
-    case 7: ChangeDisplay("ON->BLACK ", 3); break;
-    case 8: ChangeDisplay("CAP BLACK ", 3); break;
-    case 9: ChangeDisplay("DONE      ", 3); break;
-    default: ChangeDisplay("DONE      ", 3); break;
-  }
-}
-
+// -------------------- Task (call fast) -------------------------------------
 void Line_Task(void)
 {
-  static unsigned int last_ts = 0;
+  unsigned L, R;
+  unsigned bL, bR;
+  unsigned any_black, both_black, both_white;
 
-  unsigned L;
-
-  // 200ms tick gating
-  if(Time_Sequence == last_ts) return;
-  last_ts = Time_Sequence;
-
-  // LEFT detector only
   L = ADC_ReadChannel(ADC_CH_LEFT);
+  R = ADC_ReadChannel(ADC_CH_RIGHT);
 
-  // Display emitter + left value always
-  ChangeDisplay(EmitterText(emitter_on_state), 0);
-  ChangeDisplay(MakeLeftLine(L),              1);
-  ChangeDisplay("R: BROKEN",                  2);
+  // ADC values MUST be displayed at all times
+  DisplayAlways(L, R);
 
-  // Consume SW1
-  if(sw1_pressed)
+  if(update_display)
   {
-    sw1_pressed = 0;
+    update_display = 0;
 
-    if(mode == MODE_MANUAL)
-    {
-      // capture steps
-      if(step == 1u) { white_off = L; have_white_off = 1; }
-      if(step == 3u) { black_off = L; have_black_off = 1; }
-      if(step == 4u) { emitter_on_state = 1; Emitter_On(); }
-      if(step == 6u) { white_on  = L; have_white_on  = 1; }
-      if(step == 8u) { black_on  = L; have_black_on  = 1; }
-
-      step++;
-
-      // after finishing captures, go to TA ready on next press
-      if(step >= 10u)
-      {
-        SetMode(MODE_AUTO_READY);
-      }
-    }
-    else if(mode == MODE_AUTO_READY)
-    {
-      // TA presses SW1 to start
-      SetMode(MODE_AUTO_DELAY);
-    }
+    if(st == ST_CAL_WHITE)        ChangeDisplay("WHITE->SW1", 3);
+    else if(st == ST_CAL_BLACK)   ChangeDisplay("BLACK->SW1", 3);
+    else if(st == ST_CAL_READY)   ChangeDisplay("SW1 START ", 3);
+    else if(st == ST_RUN_FWD)     ChangeDisplay("FWD->BLACK", 3);
+    else if(st == ST_RUN_REV)     ChangeDisplay("REV->BLACK", 3);
+    else if(st == ST_TURN_LOSE)   ChangeDisplay("TURN: LOSE", 3);
+    else if(st == ST_TURN_CORRECT)ChangeDisplay("TURN: FIX ", 3);
+    else                          ChangeDisplay("DONE      ", 3);
   }
 
-  // -------- MANUAL mode --------
-  if(mode == MODE_MANUAL)
+  // -------------------- CALIBRATION GATE: motors NEVER move here ------------
+  if(st == ST_CAL_WHITE || st == ST_CAL_BLACK || st == ST_CAL_READY)
   {
-    ManualPrompt();
+    StopAll_Hard();
+
+    if(sw1_pressed)
+    {
+      sw1_pressed = 0;
+
+      if(st == ST_CAL_WHITE)
+      {
+        whiteL = L; whiteR = R;
+        have_white = 1;
+        st = ST_CAL_BLACK;
+      }
+      else if(st == ST_CAL_BLACK)
+      {
+        blackL = L; blackR = R;
+        have_black = 1;
+        st = ST_CAL_READY;
+      }
+      else
+      {
+        if(have_white && have_black)
+        {
+          st = ST_RUN_FWD;
+          stable_count = 0;
+          rev_seen_white = 0;
+          turn_dir = 0;
+          corr_dir = 0;
+        }
+        else
+        {
+          have_white = 0;
+          have_black = 0;
+          st = ST_CAL_WHITE;
+        }
+      }
+    }
+    return;
+  }
+  // -------------------------------------------------------------------------
+
+  // Compute black flags (RUN only)
+  bL = IsBlack(L, whiteL, blackL);
+  bR = IsBlack(R, whiteR, blackR);
+
+  any_black  = (unsigned)(bL || bR);
+  both_black = (unsigned)(bL && bR);
+  both_white = (unsigned)((!bL) && (!bR));
+
+  // -------------------- Forward until hit black -----------------------------
+  if(st == ST_RUN_FWD)
+  {
+    DriveLR(motor_forward, motor_forward);
+
+    if(any_black)
+    {
+      stable_count++;
+      if(stable_count >= STABLE_HITS)
+      {
+        st = ST_RUN_REV;
+        stable_count = 0;
+        rev_seen_white = 0;
+      }
+    }
+    else stable_count = 0;
+
     return;
   }
 
-  // -------- TA modes --------
-  switch(mode)
+  // -------------------- Reverse slowly until hit black again ----------------
+  if(st == ST_RUN_REV)
   {
-    case MODE_AUTO_READY:
-      WheelCommand_Tick('~');
+    DriveLR_PWM(motor_reverse, motor_reverse, REV_SLOW_DUTY_PCT);
 
-      // ensure emitter ON for run
-      if(!emitter_on_state) { emitter_on_state = 1; Emitter_On(); }
+    // Must leave line first
+    if(both_white)
+    {
+      rev_seen_white = 1;
+      stable_count = 0;
+    }
 
-      if(!have_white_on || !have_black_on)
-        ChangeDisplay("NEED CAP ", 3);
-      else
-        ChangeDisplay("SW1 START", 3);
-      break;
-
-    case MODE_AUTO_DELAY:
-      WheelCommand_Tick('~');
-      ChangeDisplay("DELAY 1s ", 3);
-      mode_ticks++;
-      if(mode_ticks >= TICKS_1S)
-        SetMode(MODE_AUTO_FORWARD);
-      break;
-
-    case MODE_AUTO_FORWARD:
-      ChangeDisplay("FWD->BLK ", 3);
-      WheelCommand_Tick('F');
-
-      if(IsBlack_Left(L))
+    if(rev_seen_white && any_black)
+    {
+      stable_count++;
+      if(stable_count >= STABLE_HITS)
       {
-        WheelCommand_Tick('~');
-        ChangeDisplay("BLACKLINE", 3);
-        SetMode(MODE_AUTO_STOP);
+        // Choose turn direction based on which sensor sees black now
+        if(bL && !bR) turn_dir = 1;
+        else if(bR && !bL) turn_dir = 0;
+
+        // Correction will be opposite direction
+        corr_dir = (unsigned char)(turn_dir ? 0 : 1);
+
+        // NEXT: spin until we LOSE the line
+        st = ST_TURN_LOSE;
+        stable_count = 0;
       }
-      break;
+    }
+    else
+    {
+      if(!any_black) stable_count = 0;
+    }
 
-    case MODE_AUTO_STOP:
-      WheelCommand_Tick('~');
-      ChangeDisplay("BLACKLINE", 3);
-      mode_ticks++;
-      if(mode_ticks >= TICKS_4S)
-        SetMode(MODE_AUTO_TURN);
-      break;
-
-    case MODE_AUTO_TURN:
-      ChangeDisplay("TURN->BLK", 3);
-
-      // Turn one direction only (simple, since right sensor is dead).
-      // Swap '<' and '>' if your turn direction is opposite.
-      WheelCommand_Tick('>');
-
-      if(IsBlack_Left(L))
-      {
-        WheelCommand_Tick('~');
-        SetMode(MODE_AUTO_DONE);
-      }
-      break;
-
-    default:
-      WheelCommand_Tick('~');
-      ChangeDisplay("BLK VALUE", 3);
-      // Line 1 already shows current left reading
-      break;
+    return;
   }
+
+  // -------------------- Turn FAST until we LOSE the line --------------------
+  if(st == ST_TURN_LOSE)
+  {
+    // Turn in turn_dir until BOTH sensors read white stably
+    if(turn_dir)
+    {
+      // RIGHT
+      DriveLR_PWM(motor_forward, motor_reverse, TURN_FAST_DUTY_PCT);
+    }
+    else
+    {
+      // LEFT
+      DriveLR_PWM(motor_reverse, motor_forward, TURN_FAST_DUTY_PCT);
+    }
+
+    if(both_white)
+    {
+      stable_count++;
+      if(stable_count >= STABLE_HITS)
+      {
+        // Now go BACK slowly in the OPPOSITE direction
+        st = ST_TURN_CORRECT;
+        stable_count = 0;
+      }
+    }
+    else stable_count = 0;
+
+    return;
+  }
+
+  // -------------------- Turn SLOW in OPPOSITE direction until BOTH black ----
+  if(st == ST_TURN_CORRECT)
+  {
+    if(corr_dir)
+    {
+      // RIGHT
+      DriveLR_PWM(motor_forward, motor_reverse, TURN_SLOW_DUTY_PCT);
+    }
+    else
+    {
+      // LEFT
+      DriveLR_PWM(motor_reverse, motor_forward, TURN_SLOW_DUTY_PCT);
+    }
+
+    if(both_black)
+    {
+      stable_count++;
+      if(stable_count >= STABLE_HITS)
+      {
+        StopAll_Hard();
+        st = ST_DONE;
+      }
+    }
+    else stable_count = 0;
+
+    return;
+  }
+
+  // -------------------- Done ------------------------------------------------
+  StopAll_Hard();
 }
